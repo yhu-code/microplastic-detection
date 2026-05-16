@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>微塑料检测系统</title>
+    <!-- 引入 Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body, html {
+    height: 100%;
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+        #sidebar {
+            width: 220px;
+            background-color: #1f3c88;
+            color: white;
+            height: 100%;
+            padding-top: 20px;
+        }
+        #sidebar a {
+            color: white;
+            text-decoration: none;
+            display: block;
+            padding: 10px 20px;
+        }
+        #sidebar a:hover {
+            background-color: #1450a1;
+            border-radius: 4px;
+        }
+        #main {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #f7f9fc;
+        }
+        .card {
+            margin-bottom: 20px;
+        }
+        .d-flex {
+    min-height: 100vh; /* 保证左侧导航和右侧内容撑满屏幕 */
+}
+    </style>
+</head>
+
+<body>
+    <div class="d-flex">
+        <!-- 左侧导航栏 -->
+        <div id="sidebar" class="d-flex flex-column">
+            <h4 class="text-center">微塑料检测系统</h4>
+            <a href="#">检测分析</a>
+            <a href="#">标定管理</a>
+            <a href="#">数据记录</a>
+            <a href="#">浓度标定</a>
+            <a href="#">模型管理</a>
+            <a href="#">系统设置</a>
+        </div>
+
+        <!-- 右侧主内容区域 -->
+        <div id="main">
+            <h3>检测分析</h3>
+            <p>上传样品光谱图像，进行微塑料检测与浓度分析</p>
+
+            <div class="row">
+
+    <!-- 左侧上传 -->
+    <div class="col-md-3">
+        <div class="card p-3">
+            <h5>1. 上传光谱图像</h5>
+            <input type="file"
+                   id="fileInput"
+                   class="form-control mb-3">
+            <button class="btn btn-primary w-100"
+                    onclick="upload()">
+                开始检测分析
+            </button>
+            <p id="result" style="margin-top:15px;">
+                等待检测...
+            </p>
+        </div>
+
+    </div>
+    <!-- 中间光谱图 -->
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h5>2. 光谱分析结果</h5>
+            <img id="spectrum"
+                 style="width:100%;
+                 display:none;
+                 border:1px solid #ddd;
+                 border-radius:8px;
+                 margin-top:10px;">
+        </div>
+    </div>
+    <!-- 右侧检测结果 -->
+    <div class="col-md-3">
+        <div class="card p-3">
+            <h5>3. 检测结果</h5>
+            <div id="resultCard" style="display:none;">
+
+    <div class="alert alert-success">
+        <h5 id="status"></h5>
+    </div>
+
+    <p>
+        <strong>R 值：</strong>
+        <span id="Rval"></span>
+    </p>
+
+    <p>
+        <strong>浓度估计：</strong>
+        <span id="concentration"></span>
+    </p>
+    <p>
+    <strong>污染等级：</strong>
+    <span id="riskLevel"></span>
+    </p>
+</div>
+        </div>
+    </div>
+</div>
+    <h5>4. 检测记录</h5>
+    <table class="table table-striped table-bordered">
+        <thead>
+            <tr>
+                <th>序号</th>
+                <th>文件名</th>
+                <th>检测时间</th>
+                <th>R 值</th>
+                <th>浓度 (mg/L)</th>
+                <th>检测结果</th>
+                <th>风险等级</th>
+            </tr>
+        </thead>
+        <tbody id="recordTable">
+            <!-- JS 动态添加记录 -->
+        </tbody>
+    </table>
+</div>
+
+    <script>
+        function upload() {
+            let file = document.getElementById("fileInput").files[0];
+
+            if (!file) {
+                alert("请先选择文件！");
+                return;
+            }
+
+            let formData = new FormData();
+            formData.append("file", file);
+
+            document.getElementById("result").innerText = "检测中...";
+
+            fetch("/analyze", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // 显示结果
+                document.getElementById("result").innerText =
+                    "检测结果：" + data.result + "\nR值：" + data.R;
+
+                // 显示光谱图
+                let img = document.getElementById("spectrum");
+                img.src = "/static/" + data.spectrum;
+                img.style.display = "block";
+
+                // 显示检测结果卡片
+                document.getElementById("resultCard").style.display = "block";
+                document.getElementById("status").innerText = data.result;
+                document.getElementById("Rval").innerText = data.R.toFixed(4);
+               document.getElementById("concentration").innerText = data.concentration != null ? data.concentration.toFixed(2) + " mg/L" : "-";
+                // 风险等级判断
+let risk = "";
+
+if (data.concentration != null) {
+
+    if (data.concentration < 10) {
+        risk = "低风险：安全";
+    }
+
+    else if (data.concentration < 50) {
+        risk = "中风险：轻度污染";
+    }
+
+    else {
+        risk = "高风险：严重污染";
+    }
+
+}
+else {
+    risk = "-";
+}
+
+// 显示风险等级
+document.getElementById("riskLevel").innerText = risk;
+               // 添加到检测记录表格
+                let table = document.getElementById("recordTable");
+                let row = table.insertRow(0);  // 最新记录放上面
+                let now = new Date().toLocaleString();
+
+                let concentration = (data.concentration != null) ? data.concentration.toFixed(2) : '-';
+
+row.innerHTML = `
+    <td>${table.rows.length}</td>
+    <td>${file.name}</td>
+    <td>${now}</td>
+    <td>${data.R.toFixed(4)}</td>
+    <td>${concentration}</td>
+    <td>${data.result}</td>
+    <td>${risk}</td>
+`;
+
+                // 防缓存（每次刷新）
+                img.src = "/static/spectrum.png?t=" + new Date().getTime();
+
+                img.style.display = "block";
+            })
+            .catch(err => {
+                document.getElementById("result").innerText = "出错了！";
+                console.error(err);
+            });
+        }
+    </script>
+</body>
+</html>
